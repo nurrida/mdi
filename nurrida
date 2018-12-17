@@ -1,0 +1,90 @@
+from IPython.core.interactiveshell import InteractiveShell
+InteractiveShell.ast_node_interactivity = "all"
+
+import pandas as pd
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
+%matplotlib inline
+from numpy import mean
+from numpy import std
+
+#membaca file dosen dan mahasiswa
+raw_dosen = pd.read_excel(
+    'D:/Post Graduate/Management Data dan Informasi/Tuas/Source/Dosen_matkul2.xlsx', na_values='null')
+raw_mhs = pd.read_excel(
+    'D:/Post Graduate/Management Data dan Informasi/Tuas/Source/mhs_matkul.xlsx', na_values='null')
+data_mhs = pd.read_excel(
+    'D:/Post Graduate/Management Data dan Informasi/Tuas/Source/mhs.xlsx', na_values='null')
+
+#menghapus kolom yang tidak diperlukan
+column_to_drop = ['No', 'Matakuliah', 'Email']
+row_to_drop = data_mhs[(data_mhs['Fakultas'].str.contains('Fakultas') == False) & 
+                        (data_mhs['Fakultas'].str.contains('Pasca') == False)].index
+#raw_dosen.drop(columns=column_to_drop, inplace=True)
+#raw_mhs.drop(columns=column_to_drop, inplace=True)
+data_mhs.drop(columns=column_to_drop, inplace=True)
+data_mhs.drop(row_to_drop, inplace=True)
+
+#split kolom dosen_matkul
+dosen = raw_dosen['Dosen'].str.split(r'\s+(?=\d)|(?<=\d)\s+', expand=True)
+raw_dosen['Dosen'] = dosen[0]
+raw_dosen['ID'] = dosen[1]
+raw_dosen.rename(columns={'Dosen':'Nama'}, inplace=True)
+
+#split kolom mhs_matkul
+mhs = raw_mhs['Mahasiswa'].str.split(r'\s+(?=\d)|(?<=\d)\s+', expand=True)
+raw_mhs['Mahasiswa'] = mhs[0]
+raw_mhs['ID'] = mhs[1]
+raw_mhs.rename(columns={'Mahasiswa':'Nama'}, inplace=True)
+
+#split mhs
+m = data_mhs['Mahasiswa'].str.split(r'\s+(?=\d)|(?<=\d)\s+', expand=True)
+data_mhs['Mahasiswa'] = m[0]
+data_mhs['ID'] = m[1]
+data_mhs.rename(columns={'Mahasiswa':'Nama'}, inplace=True)
+
+#parse date
+raw_dosen['Last access'] = pd.to_datetime(raw_dosen['Last access'], format='%A, %d %B %Y, %I:%M %p')
+raw_mhs['Last access'] = pd.to_datetime(raw_mhs['Last access'], format='%A, %d %B %Y, %I:%M %p')
+
+#menghitung total akses per tahun
+user_access = [raw_dosen, raw_mhs]
+total_user_access = pd.concat(user_access)
+
+#menghapus baris dan kolom yang tidak diperlukan
+row_to_drop = total_user_access[(total_user_access['Fakultas'].str.contains('Fakultas') == False) & 
+                        (total_user_access['Fakultas'].str.contains('Pasca') == False)].index
+total_user_access.drop(columns=column_to_drop, inplace=True)
+total_user_access.drop(row_to_drop, inplace=True)
+
+
+#menampilkan grafik
+fig,ax = plt.subplots(figsize=(10,8))
+
+#total user access per tahun
+total_access_per_year = total_user_access.groupby([(
+    total_user_access['Last access'].dt.year)]).count()['Nama'].plot(ax=ax)
+
+#total user access per tahun per fakultas
+total_access_per_year = total_user_access.groupby([(
+    total_user_access['Last access'].dt.year), total_user_access['Fakultas']]).count()['Nama'].unstack().plot(ax=ax)
+ax.set_xlabel('Tahun')
+ax.set_ylabel('Total')
+total_access_per_year
+
+#total mhs per fakultas
+mhs_per_fk = data_mhs.groupby([data_mhs['Fakultas']]).count()['Nama'].plot.bar(ax=ax)
+ax.set_xlabel('Fakultas')
+ax.set_xlabel('Total')
+
+#menghitung korelasi
+total_mhs_per_fk = data_mhs.groupby([data_mhs['Fakultas']])['Nama'].count()
+total_dosen_access = raw_dosen.groupby([raw_dosen['Fakultas']])['Nama'].count()
+total_mhs_access = raw_mhs.groupby([raw_mhs['Fakultas']])['Nama'].count()
+
+np.corrcoef(total_dosen_access, total_mhs_access)
+plt.scatter(total_mhs_access, total_mhs_access)
+
+np.corrcoef(total_mhs_per_fk, total_mhs_access)
+plt.scatter(total_mhs_per_fk, total_mhs_access)
